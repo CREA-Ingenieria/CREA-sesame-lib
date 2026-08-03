@@ -8,7 +8,7 @@ _controller: SesameRobotController | None = None
 _stop_event = threading.Event()
 
 def _reset_stop():
-    """Clears the stop signal — called before starting any movement sequence."""
+    """Función privada: Quita el stop para evitar problemas con la conexión inicial."""
     _stop_event.clear()
 
 def get_stop_event() -> threading.Event:
