@@ -13,9 +13,11 @@
     html, body {
       width: 100%; height: 100%;
       font-family: 'Segoe UI', sans-serif;
-      background: #1e1e2e; color: #2e3037;
+      background: #1e1e2e; color: #474a55;
       display: flex; flex-direction: column; overflow: hidden;
     }
+
+    /* ── Top bar ── */
     #topbar {
       display: flex; align-items: center; gap: 8px;
       padding: 8px 14px; background: #A8A492;
@@ -26,8 +28,8 @@
       padding: 6px 14px; border: none; border-radius: 7px;
       font-size: 12px; font-weight: 700; cursor: pointer; transition: filter 0.15s;
     }
-    button:hover   { filter: brightness(1.15); }
-    button:disabled{ opacity: 0.35; cursor: not-allowed; }
+    button:hover    { filter: brightness(1.15); }
+    button:disabled { opacity: 0.35; cursor: not-allowed; }
     #btn-mock    { background:#6d6f7a; color:#f2f3f5; }
     #btn-connect { background:#66BB6A; color:#E8F5E9; }
     #btn-run     { background:#771df6; color:#e0e0ec; }
@@ -39,11 +41,27 @@
     }
     #status.ok  { background:#66BB6A; color:#E8F5E9; }
     #status.err { background:#e92c62; color:#eeeef0; }
+
+    /* ── Main area ── */
+    #error-banner {
+      display:none; background:#f38ba8; color:#1e1e2e;
+      font-size:12px; font-weight:600; padding:6px 14px;
+      text-align:center; flex-shrink:0;
+    }
     #main { display:flex; flex:1; overflow:hidden; min-height:0; }
     #blockly-div { flex:1; min-width:0; position:relative; }
+
+    /* ── Right panel ── */
+    #right-panel {
+      width: 270px; flex-shrink: 0;
+      display: flex; flex-direction: column;
+      background: #181825; border-left: 2px solid #313244;
+    }
+
+    /* Code preview */
     #preview {
-      width:260px; flex-shrink:0; display:flex; flex-direction:column;
-      background:#524646; border-left:2px solid #313244;
+      flex: 1; display: flex; flex-direction: column;
+      border-bottom: 2px solid #313244; min-height: 0;
     }
     #preview h2 {
       font-size:12px; padding:9px 13px; color:#EC5B38;
@@ -55,10 +73,42 @@
       font-size:11px; line-height:1.65; color:#a6e3a1;
       white-space:pre-wrap; word-break:break-word;
     }
-    #error-banner {
-      display:none; background:#f38ba8; color:#1e1e2e;
-      font-size:12px; font-weight:600; padding:6px 14px;
-      text-align:center; flex-shrink:0;
+
+    /* Variable manager */
+    #var-panel {
+      flex-shrink: 0;
+      padding: 10px 13px;
+      max-height: 220px;
+      display: flex; flex-direction: column; gap: 6px;
+    }
+    #var-panel-header {
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    #var-panel-header span {
+      font-size: 12px; font-weight: 700; color: #f1a340;
+    }
+    #btn-nueva-var {
+      background: #f1a340; color: #1e1e2e;
+      padding: 4px 10px; font-size: 11px; border-radius: 6px;
+    }
+    #var-list {
+      overflow-y: auto; display: flex; flex-direction: column; gap: 4px;
+    }
+    .var-item {
+      display: flex; align-items: center; justify-content: space-between;
+      background: #313244; border-radius: 6px; padding: 4px 8px;
+      font-size: 11px;
+    }
+    .var-item span { color: #cdd6f4; font-family: 'Consolas', monospace; }
+    .var-delete {
+      background: none; border: none; color: #f38ba8;
+      cursor: pointer; font-size: 13px; padding: 0 2px;
+      font-weight: 700; line-height: 1;
+    }
+    .var-delete:hover { color: #e92c62; filter: none; }
+    #var-empty {
+      font-size: 11px; color: #6c7086; font-style: italic;
+      text-align: center; padding: 6px 0;
     }
   </style>
 </head>
@@ -80,16 +130,33 @@
 
 <div id="main">
   <div id="blockly-div"></div>
-  <div id="preview">
-    <h2>Código generado en Python:</h2>
-    <div id="code-output"># Arrastra bloques debajo de
+
+  <div id="right-panel">
+
+    <!-- Code preview -->
+    <div id="preview">
+      <h2>Código generado en Python:</h2>
+      <div id="code-output"># Arrastra bloques debajo de
 # "🟢 Al iniciar" para ver
 # el código aquí.</div>
+    </div>
+
+    <!-- Variable manager -->
+    <div id="var-panel">
+      <div id="var-panel-header">
+        <span>Variables</span>
+        <button id="btn-nueva-var" onclick="nuevaVariable()">+ Nueva variable</button>
+      </div>
+      <div id="var-list">
+        <div id="var-empty">Sin variables. Crea una para empezar.</div>
+      </div>
+    </div>
+
   </div>
 </div>
 
 <script>
-// ── Guard ────────────────────────────────────────────────────────────────────
+// ── Guard ─────────────────────────────────────────────────────────────────────
 if (typeof Blockly === 'undefined' || typeof Blockly.Python === 'undefined') {
   document.getElementById('error-banner').style.display = 'block';
   document.getElementById('main').style.display = 'none';
@@ -98,105 +165,99 @@ if (typeof Blockly === 'undefined' || typeof Blockly.Python === 'undefined') {
 
 const pyGen = Blockly.Python;
 
+// ORDER_NONE is just 0 in Blockly 9.x — don't use pyGen.ORDER_NONE,
+// it's undefined. Use the literal value instead.
+const ORDER_NONE = 0;
+
+
 // ── Message strings ───────────────────────────────────────────────────────────
-Blockly.Msg['CONTROLS_REPEAT_TITLE']                    = 'Repetir %1 veces';
-Blockly.Msg['CONTROLS_REPEAT_INPUT_DO']                 = 'hacer';
-Blockly.Msg['CONTROLS_REPEAT_TOOLTIP']                  = 'Repite los bloques internos N veces.';
-Blockly.Msg['CONTROLS_REPEAT_HELPURL']                  = '';
-Blockly.Msg['CONTROLS_WHILEUNTIL_OPERATOR_WHILE']       = 'Repetir mientras';
-Blockly.Msg['CONTROLS_WHILEUNTIL_OPERATOR_UNTIL']       = 'Repetir hasta que';
-Blockly.Msg['CONTROLS_WHILEUNTIL_TOOLTIP_WHILE']        = 'Repite los bloques mientras la condición sea verdadera.';
-Blockly.Msg['CONTROLS_WHILEUNTIL_TOOLTIP_UNTIL']        = 'Repite los bloques hasta que la condición sea verdadera.';
-Blockly.Msg['CONTROLS_WHILEUNTIL_HELPURL']              = '';
-Blockly.Msg['MATH_NUMBER_TOOLTIP']                      = 'Un número.';
-Blockly.Msg['MATH_NUMBER_HELPURL']                      = '';
-Blockly.Msg['MATH_ARITHMETIC_HELPURL']                  = '';
-Blockly.Msg['MATH_ARITHMETIC_TOOLTIP_ADD']              = 'Suma dos números.';
-Blockly.Msg['MATH_ARITHMETIC_TOOLTIP_MINUS']            = 'Resta dos números.';
-Blockly.Msg['MATH_ARITHMETIC_TOOLTIP_MULTIPLY']         = 'Multiplica dos números.';
-Blockly.Msg['MATH_ARITHMETIC_TOOLTIP_DIVIDE']           = 'Divide dos números.';
-Blockly.Msg['MATH_ARITHMETIC_TITLE']                    = '%1 %2 %3';
-Blockly.Msg['MATH_ADDITION_SYMBOL']                     = '+';
-Blockly.Msg['MATH_SUBTRACTION_SYMBOL']                  = '-';
-Blockly.Msg['MATH_MULTIPLICATION_SYMBOL']               = '×';
-Blockly.Msg['MATH_DIVISION_SYMBOL']                     = '÷';
-Blockly.Msg['MATH_RANDOM_INT_TITLE']                    = 'número aleatorio entre %1 y %2';
-Blockly.Msg['MATH_RANDOM_INT_TOOLTIP']                  = 'Número entero aleatorio entre los dos valores (inclusive).';
-Blockly.Msg['MATH_RANDOM_INT_HELPURL']                  = '';
-Blockly.Msg['LOGIC_BOOLEAN_TRUE']                       = 'verdadero';
-Blockly.Msg['LOGIC_BOOLEAN_FALSE']                      = 'falso';
-Blockly.Msg['LOGIC_BOOLEAN_TOOLTIP']                    = 'Un valor booleano: verdadero o falso.';
-Blockly.Msg['LOGIC_BOOLEAN_HELPURL']                    = '';
-Blockly.Msg['LOGIC_COMPARE_TOOLTIP_EQ']                 = 'Verdadero si los dos valores son iguales.';
-Blockly.Msg['LOGIC_COMPARE_TOOLTIP_NEQ']                = 'Verdadero si los dos valores son distintos.';
-Blockly.Msg['LOGIC_COMPARE_TOOLTIP_LT']                 = 'Verdadero si el primero es menor que el segundo.';
-Blockly.Msg['LOGIC_COMPARE_TOOLTIP_LTE']                = 'Verdadero si el primero es menor o igual que el segundo.';
-Blockly.Msg['LOGIC_COMPARE_TOOLTIP_GT']                 = 'Verdadero si el primero es mayor que el segundo.';
-Blockly.Msg['LOGIC_COMPARE_TOOLTIP_GTE']                = 'Verdadero si el primero es mayor o igual que el segundo.';
-Blockly.Msg['LOGIC_COMPARE_HELPURL']                    = '';
-Blockly.Msg['LOGIC_OPERATION_AND']                      = 'y';
-Blockly.Msg['LOGIC_OPERATION_OR']                       = 'o';
-Blockly.Msg['LOGIC_OPERATION_TOOLTIP_AND']              = 'Verdadero si ambas condiciones son verdaderas.';
-Blockly.Msg['LOGIC_OPERATION_TOOLTIP_OR']               = 'Verdadero si al menos una condición es verdadera.';
-Blockly.Msg['LOGIC_OPERATION_HELPURL']                  = '';
-Blockly.Msg['LOGIC_NEGATE_TITLE']                       = 'no %1';
-Blockly.Msg['LOGIC_NEGATE_TOOLTIP']                     = 'Invierte el valor booleano.';
-Blockly.Msg['LOGIC_NEGATE_HELPURL']                     = '';
-// Variables — all required strings for the VARIABLE custom category
-Blockly.Msg['VARIABLES_DEFAULT_NAME']                   = 'variable';
-Blockly.Msg['VARIABLES_SET']                            = 'establecer %1 a %2';
-Blockly.Msg['VARIABLES_GET']                            = '%1';
-Blockly.Msg['VARIABLES_SET_TOOLTIP']                    = 'Asigna un valor a esta variable.';
-Blockly.Msg['VARIABLES_GET_TOOLTIP']                    = 'El valor de esta variable.';
-Blockly.Msg['VARIABLES_SET_HELPURL']                    = '';
-Blockly.Msg['VARIABLES_GET_HELPURL']                    = '';
-Blockly.Msg['RENAME_VARIABLE']                          = 'Renombrar variable...';
-Blockly.Msg['NEW_VARIABLE']                             = 'Nueva variable...';
-Blockly.Msg['NEW_VARIABLE_TITLE']                       = 'Nombre de la nueva variable:';
-Blockly.Msg['VARIABLE_MODAL_TITLE']                     = 'Nueva variable';
-Blockly.Msg['DELETE_VARIABLE']                          = 'Eliminar la variable "%1"';
-Blockly.Msg['VARIABLE_ALREADY_EXISTS']                  = 'Ya existe una variable llamada "%1".';
-Blockly.Msg['VARIABLE_ALREADY_EXISTS_FOR_ANOTHER_TYPE']= 'Ya existe una variable "%1" de otro tipo.';
-Blockly.Msg['DELETE_VARIABLE_CONFIRMATION']             = '¿Eliminar %1 uso(s) de la variable "%2"?';
-Blockly.Msg['CANNOT_DELETE_VARIABLE_PROCEDURE']         = 'No se puede eliminar "%1" porque es parte de "%2".';
+Blockly.Msg['CONTROLS_REPEAT_TITLE']              = 'Repetir %1 veces';
+Blockly.Msg['CONTROLS_REPEAT_INPUT_DO']           = 'hacer';
+Blockly.Msg['CONTROLS_REPEAT_TOOLTIP']            = 'Repite los bloques internos N veces.';
+Blockly.Msg['CONTROLS_REPEAT_HELPURL']            = '';
+Blockly.Msg['CONTROLS_WHILEUNTIL_OPERATOR_WHILE'] = 'Repetir mientras';
+Blockly.Msg['CONTROLS_WHILEUNTIL_OPERATOR_UNTIL'] = 'Repetir hasta que';
+Blockly.Msg['CONTROLS_WHILEUNTIL_TOOLTIP_WHILE']  = 'Repite mientras la condición sea verdadera.';
+Blockly.Msg['CONTROLS_WHILEUNTIL_TOOLTIP_UNTIL']  = 'Repite hasta que la condición sea verdadera.';
+Blockly.Msg['CONTROLS_WHILEUNTIL_HELPURL']        = '';
+Blockly.Msg['MATH_NUMBER_TOOLTIP']                = 'Un número.';
+Blockly.Msg['MATH_NUMBER_HELPURL']                = '';
+Blockly.Msg['MATH_ARITHMETIC_HELPURL']            = '';
+Blockly.Msg['MATH_ARITHMETIC_TOOLTIP_ADD']        = 'Suma dos números.';
+Blockly.Msg['MATH_ARITHMETIC_TOOLTIP_MINUS']      = 'Resta dos números.';
+Blockly.Msg['MATH_ARITHMETIC_TOOLTIP_MULTIPLY']   = 'Multiplica dos números.';
+Blockly.Msg['MATH_ARITHMETIC_TOOLTIP_DIVIDE']     = 'Divide dos números.';
+Blockly.Msg['MATH_ARITHMETIC_TITLE']              = '%1 %2 %3';
+Blockly.Msg['MATH_ADDITION_SYMBOL']               = '+';
+Blockly.Msg['MATH_SUBTRACTION_SYMBOL']            = '-';
+Blockly.Msg['MATH_MULTIPLICATION_SYMBOL']         = '×';
+Blockly.Msg['MATH_DIVISION_SYMBOL']               = '÷';
+Blockly.Msg['MATH_RANDOM_INT_TITLE']              = 'número aleatorio entre %1 y %2';
+Blockly.Msg['MATH_RANDOM_INT_TOOLTIP']            = 'Número entero aleatorio entre los dos valores.';
+Blockly.Msg['MATH_RANDOM_INT_HELPURL']            = '';
+Blockly.Msg['LOGIC_BOOLEAN_TRUE']                 = 'verdadero';
+Blockly.Msg['LOGIC_BOOLEAN_FALSE']                = 'falso';
+Blockly.Msg['LOGIC_BOOLEAN_TOOLTIP']              = 'Un valor booleano: verdadero o falso.';
+Blockly.Msg['LOGIC_BOOLEAN_HELPURL']              = '';
+Blockly.Msg['LOGIC_COMPARE_TOOLTIP_EQ']           = 'Verdadero si los dos valores son iguales.';
+Blockly.Msg['LOGIC_COMPARE_TOOLTIP_NEQ']          = 'Verdadero si los dos valores son distintos.';
+Blockly.Msg['LOGIC_COMPARE_TOOLTIP_LT']           = 'Verdadero si el primero es menor que el segundo.';
+Blockly.Msg['LOGIC_COMPARE_TOOLTIP_LTE']          = 'Verdadero si el primero es menor o igual.';
+Blockly.Msg['LOGIC_COMPARE_TOOLTIP_GT']           = 'Verdadero si el primero es mayor que el segundo.';
+Blockly.Msg['LOGIC_COMPARE_TOOLTIP_GTE']          = 'Verdadero si el primero es mayor o igual.';
+Blockly.Msg['LOGIC_COMPARE_HELPURL']              = '';
+Blockly.Msg['LOGIC_OPERATION_AND']                = 'y';
+Blockly.Msg['LOGIC_OPERATION_OR']                 = 'o';
+Blockly.Msg['LOGIC_OPERATION_TOOLTIP_AND']        = 'Verdadero si ambas condiciones son verdaderas.';
+Blockly.Msg['LOGIC_OPERATION_TOOLTIP_OR']         = 'Verdadero si al menos una es verdadera.';
+Blockly.Msg['LOGIC_OPERATION_HELPURL']            = '';
+Blockly.Msg['LOGIC_NEGATE_TITLE']                 = 'no %1';
+Blockly.Msg['LOGIC_NEGATE_TOOLTIP']               = 'Invierte el valor booleano.';
+Blockly.Msg['LOGIC_NEGATE_HELPURL']               = '';
 
 
-// ── 1. Custom block definitions ───────────────────────────────────────────────
+// ── 1. Block definitions ──────────────────────────────────────────────────────
 Blockly.defineBlocksWithJsonArray([
+  // Hat block
   {
     "type": "sesame_al_iniciar",
     "message0": "🟢 Al iniciar",
     "nextStatement": null,
-    "colour": "#f9e2af",
+    "colour": "#edcc82",
     "tooltip": "Los bloques conectados aquí se ejecutan al presionar 'Ejecutar'"
   },
+  // Movement blocks — input_value so number/variable blocks can plug in
   {
     "type": "sesame_mover_adelante",
     "message0": "⬆ Mover adelante %1 segundo(s)",
     "args0": [{"type":"input_value","name":"DURACION","check":"Number"}],
     "previousStatement": null, "nextStatement": null,
-    "colour": "#89b4fa", "tooltip": "Mueve el robot hacia adelante.", "inputsInline": true
+    "colour": "#89b4fa", "inputsInline": true,
+    "tooltip": "Mueve el robot hacia adelante por X segundos."
   },
   {
     "type": "sesame_mover_atras",
     "message0": "⬇ Mover atrás %1 segundo(s)",
     "args0": [{"type":"input_value","name":"DURACION","check":"Number"}],
     "previousStatement": null, "nextStatement": null,
-    "colour": "#89b4fa", "tooltip": "Mueve el robot hacia atrás.", "inputsInline": true
+    "colour": "#89b4fa", "inputsInline": true,
+    "tooltip": "Mueve el robot hacia atrás por X segundos."
   },
   {
     "type": "sesame_girar_derecha",
     "message0": "↷ Girar derecha %1 segundo(s)",
     "args0": [{"type":"input_value","name":"DURACION","check":"Number"}],
     "previousStatement": null, "nextStatement": null,
-    "colour": "#89b4fa", "tooltip": "Gira el robot a la derecha.", "inputsInline": true
+    "colour": "#89b4fa", "inputsInline": true,
+    "tooltip": "Gira el robot a la derecha por X segundos."
   },
   {
     "type": "sesame_girar_izquierda",
     "message0": "↶ Girar izquierda %1 segundo(s)",
     "args0": [{"type":"input_value","name":"DURACION","check":"Number"}],
     "previousStatement": null, "nextStatement": null,
-    "colour": "#89b4fa", "tooltip": "Gira el robot a la izquierda.", "inputsInline": true
+    "colour": "#89b4fa", "inputsInline": true,
+    "tooltip": "Gira el robot a la izquierda por X segundos."
   },
   {
     "type": "sesame_girar_angulo",
@@ -206,17 +267,19 @@ Blockly.defineBlocksWithJsonArray([
       {"type":"input_value","name":"ANGULO","check":"Number"}
     ],
     "previousStatement": null, "nextStatement": null,
-    "colour": "#89b4fa", "tooltip": "Gira el robot un ángulo (0-360).", "inputsInline": true
+    "colour": "#89b4fa", "inputsInline": true,
+    "tooltip": "Gira el robot el número de grados indicado (0-360)."
   },
   {
     "type": "sesame_detener",
     "message0": "⏹ Detener robot",
     "previousStatement": null, "nextStatement": null,
-    "colour": "#f38ba8", "tooltip": "Detiene el robot inmediatamente."
+    "colour": "#f38ba8",
+    "tooltip": "Detiene el robot inmediatamente."
   },
   {
     "type": "sesame_emote",
-    "message0": "😊 Hacer emote %1",
+    "message0": "Hacer emote %1",
     "args0": [{"type":"field_dropdown","name":"EMOTE","options":[
       ["rest","rest"],["swim","swim"],["dance","dance"],["wave","wave"],
       ["point","point"],["stand","stand"],["cute","cute"],["pushup","pushup"],
@@ -224,176 +287,239 @@ Blockly.defineBlocksWithJsonArray([
       ["shrug","shrug"],["dead","dead"],["crab","crab"],["idle","idle"]
     ]}],
     "previousStatement": null, "nextStatement": null,
-    "colour": "#cba6f7", "tooltip": "Hace que el robot realice un emote."
-  }
-]);
-
-// ── REPLACE the variables section in your script with all of this ─────────────
-
-// Step A: Define a custom "set variable" block with a text field for the name
-// and a value input for the value. Simpler than Blockly's built-in variable
-// system which doesn't work reliably in v9 without the full messages file.
-Blockly.defineBlocksWithJsonArray([
+    "colour": "#cba6f7",
+    "tooltip": "Hace que el robot realice un emote."
+  },
+  // Variable blocks — one pair per variable, built dynamically
+  // These are templates; actual instances are created per-variable
   {
     "type": "sesame_var_set",
-    "message0": "establecer variable %1 a %2",
+    "message0": "establecer %1 a %2",
     "args0": [
-      {
-        "type": "field_input",
-        "name": "VAR_NAME",
-        "text": "miVariable"
-      },
-      {
-        "type": "input_value",
-        "name": "VALUE"
-      }
+      {"type":"field_input","name":"VAR_NAME","text":"variable"},
+      {"type":"input_value","name":"VALUE"}
     ],
-    "previousStatement": null,
-    "nextStatement": null,
-    "colour": "#f1a340",
-    "tooltip": "Crea o actualiza una variable con el nombre y valor dados.",
-    "inputsInline": true
+    "previousStatement": null, "nextStatement": null,
+    "colour": "#f1a340", "inputsInline": true,
+    "tooltip": "Asigna un valor a esta variable."
   },
   {
     "type": "sesame_var_get",
-    "message0": "variable %1",
+    "message0": "valor de %1",
     "args0": [
-      {
-        "type": "field_input",
-        "name": "VAR_NAME",
-        "text": "miVariable"
-      }
+      {"type":"field_input","name":"VAR_NAME","text":"variable"}
     ],
     "output": null,
     "colour": "#f1a340",
-    "tooltip": "El valor actual de esta variable. Escribe el mismo nombre que usaste al crearla."
+    "tooltip": "El valor actual de esta variable."
   }
 ]);
 
-// Step B: Python generators for the custom variable blocks
-pyGen['sesame_var_set'] = (b) => {
-  const name  = b.getFieldValue('VAR_NAME').trim() || 'miVariable';
-  const value = pyGen.valueToCode(b, 'VALUE', pyGen.ORDER_NONE) || '0';
-  return `${name} = ${value}\n`;
-};
-
-pyGen['sesame_var_get'] = (b) => {
-  const name = b.getFieldValue('VAR_NAME').trim() || 'miVariable';
-  return [name, pyGen.ORDER_ATOMIC];
-};
-
-// Step C: Replace the Variables category in toolboxConfig with this:
-// (swap out the { kind:"category", name:"Variables", custom:"VARIABLE" } entry)
-const variablesCategory = {
-  kind: "category",
-  name: "Variables",
-  colour: "#f1a340",
-  contents: [
-    {
-      kind: "block",
-      type: "sesame_var_set",
-      inputs: {
-        VALUE: { shadow: { type: "math_number", fields: { NUM: 0 } } }
-      }
-    },
-    {
-      kind: "block",
-      type: "sesame_var_get"
-    }
-  ]
-};
-
-// Also add to the exec namespace in editor.py so variables work at runtime —
-// add this line inside the `namespace` dict in ejecutar_codigo():
-//   "__builtins__": {"range": range, "print": print},
-// Change the current "__builtins__": {} to the above so that variable
-// assignments (x = 3) work in exec() without a NameError.
-
 
 // ── 2. Python generators ──────────────────────────────────────────────────────
-pyGen['sesame_al_iniciar']      = ()         => '';
-pyGen['sesame_detener']         = ()         => 'detener()\n';
-pyGen['sesame_emote']           = b          => `hacer_emote("${b.getFieldValue('EMOTE')}")\n`;
-pyGen['sesame_mover_adelante']  = (b, gen)   => `mover_adelante(${pyGen.valueToCode(b,'DURACION',gen.ORDER_NONE)||'1'})\n`;
-pyGen['sesame_mover_atras']     = (b, gen)   => `mover_atras(${pyGen.valueToCode(b,'DURACION',gen.ORDER_NONE)||'1'})\n`;
-pyGen['sesame_girar_derecha']   = (b, gen)   => `girar_derecha(${pyGen.valueToCode(b,'DURACION',gen.ORDER_NONE)||'1'})\n`;
-pyGen['sesame_girar_izquierda'] = (b, gen)   => `girar_izquierda(${pyGen.valueToCode(b,'DURACION',gen.ORDER_NONE)||'1'})\n`;
-pyGen['sesame_girar_angulo']    = (b, gen)   => {
+// NOTE: In Blockly 9.x generator functions receive only (block) — NOT (block, generator).
+// Call pyGen.valueToCode() directly, and use the literal 0 for ORDER_NONE.
+pyGen['sesame_al_iniciar']      = ()  => '';
+pyGen['sesame_detener']         = ()  => 'detener()\n';
+pyGen['sesame_emote']           = (b) => `hacer_emote("${b.getFieldValue('EMOTE')}")\n`;
+
+pyGen['sesame_mover_adelante']  = (b) => {
+  const dur = pyGen.valueToCode(b, 'DURACION', ORDER_NONE) || '1';
+  return `mover_adelante(${dur})\n`;
+};
+pyGen['sesame_mover_atras']     = (b) => {
+  const dur = pyGen.valueToCode(b, 'DURACION', ORDER_NONE) || '1';
+  return `mover_atras(${dur})\n`;
+};
+pyGen['sesame_girar_derecha']   = (b) => {
+  const dur = pyGen.valueToCode(b, 'DURACION', ORDER_NONE) || '1';
+  return `girar_derecha(${dur})\n`;
+};
+pyGen['sesame_girar_izquierda'] = (b) => {
+  const dur = pyGen.valueToCode(b, 'DURACION', ORDER_NONE) || '1';
+  return `girar_izquierda(${dur})\n`;
+};
+pyGen['sesame_girar_angulo']    = (b) => {
   const lado = b.getFieldValue('LADO');
-  const ang  = pyGen.valueToCode(b, 'ANGULO', gen.ORDER_NONE) || '90';
+  const ang  = pyGen.valueToCode(b, 'ANGULO', ORDER_NONE) || '90';
   return lado === 'derecha'
     ? `girar_derecha_angulo(${ang})\n`
     : `girar_izquierda_angulo(${ang})\n`;
 };
-
-
-// ── 3. Toolbox ────────────────────────────────────────────────────────────────
-const toolboxConfig = {
-  kind: "categoryToolbox",
-  contents: [
-    {
-      kind:"category", name:"Movimiento", colour:"#89b4fa",
-      contents:[
-        { kind:"block", type:"sesame_mover_adelante",
-          inputs:{ DURACION:{ shadow:{ type:"math_number", fields:{ NUM:1 } } } } },
-        { kind:"block", type:"sesame_mover_atras",
-          inputs:{ DURACION:{ shadow:{ type:"math_number", fields:{ NUM:1 } } } } },
-        { kind:"block", type:"sesame_girar_derecha",
-          inputs:{ DURACION:{ shadow:{ type:"math_number", fields:{ NUM:1 } } } } },
-        { kind:"block", type:"sesame_girar_izquierda",
-          inputs:{ DURACION:{ shadow:{ type:"math_number", fields:{ NUM:1 } } } } },
-        { kind:"block", type:"sesame_girar_angulo",
-          inputs:{ ANGULO:{ shadow:{ type:"math_number", fields:{ NUM:90 } } } } },
-        { kind:"block", type:"sesame_detener" }
-      ]
-    },
-    {
-      kind:"category", name:"Emotes", colour:"#cba6f7",
-      contents:[{ kind:"block", type:"sesame_emote" }]
-    },
-    { kind:"sep" },
-    {
-      kind:"category", name:"Ciclos", colour:"#fab387",
-      contents:[
-        { kind:"block", type:"controls_repeat" },
-        { kind:"block", type:"controls_whileUntil" }
-      ]
-    },
-    {
-      // custom:"VARIABLE" auto-manages the list and shows both
-      // "establecer X a" AND "obtener X" blocks once a variable exists
-      kind:"category", name:"Variables", colour:"#f1a340",
-      custom:"VARIABLE"
-    },
-    {
-      kind:"category", name:"Operadores", colour:"#a6e3a1",
-      contents:[
-        { kind:"block", type:"math_random_int",
-          inputs:{
-            FROM:{ shadow:{ type:"math_number", fields:{ NUM:1  } } },
-            TO:{   shadow:{ type:"math_number", fields:{ NUM:10 } } }
-          }
-        },
-        { kind:"block", type:"math_number", fields:{ NUM:1 } },
-        { kind:"block", type:"math_arithmetic" }
-      ]
-    },
-    {
-      kind:"category", name:"Comparadores", colour:"#9fc5e8",
-      contents:[
-        { kind:"block", type:"logic_compare" },
-        { kind:"block", type:"logic_operation" },
-        { kind:"block", type:"logic_negate" },
-        { kind:"block", type:"logic_boolean" }
-      ]
-    }
-  ]
+pyGen['sesame_var_set'] = (b) => {
+  const name  = b.getFieldValue('VAR_NAME');
+  const value = pyGen.valueToCode(b, 'VALUE', ORDER_NONE) || '0';
+  return `${name} = ${value}\n`;
 };
+pyGen['sesame_var_get'] = (b) => {
+  const name = b.getFieldValue('VAR_NAME');
+  return [name, ORDER_NONE];
+};
+
+
+// ── 3. Variable manager ───────────────────────────────────────────────────────
+// Completely independent of Blockly's internal variable system.
+// Stores variable names in a plain array and rebuilds the toolbox
+// Variables category whenever the list changes.
+
+let variables = []; // e.g. ["velocidad", "intentos"]
+
+function buildVariablesCategory() {
+  // Each variable gets a "set" block and a "get" block in the toolbox.
+  // The VAR_NAME field_label is set via the block's mutation/serialization
+  // trick: we pre-configure it using the toolbox's "fields" property.
+  const contents = [];
+
+  if (variables.length === 0) {
+    // Toolbox categories can't be empty — add a disabled placeholder
+    contents.push({ kind: "block", type: "sesame_var_set",
+      fields: { VAR_NAME: "variable" },
+      inputs: { VALUE: { shadow: { type: "math_number", fields: { NUM: 0 } } } }
+    });
+  } else {
+    for (const name of variables) {
+      contents.push({
+        kind: "block",
+        type: "sesame_var_set",
+        fields: { VAR_NAME: name },
+        inputs: { VALUE: { shadow: { type: "math_number", fields: { NUM: 0 } } } }
+      });
+      contents.push({
+        kind: "block",
+        type: "sesame_var_get",
+        fields: { VAR_NAME: name }
+      });
+    }
+  }
+
+  return { kind: "category", name: "Variables", colour: "#f1a340", contents };
+}
+
+function buildToolboxConfig() {
+  return {
+    kind: "categoryToolbox",
+    contents: [
+      {
+        kind:"category", name:"Movimiento", colour:"#89b4fa",
+        contents:[
+          { kind:"block", type:"sesame_mover_adelante",
+            inputs:{ DURACION:{ shadow:{ type:"math_number", fields:{ NUM:1 } } } } },
+          { kind:"block", type:"sesame_mover_atras",
+            inputs:{ DURACION:{ shadow:{ type:"math_number", fields:{ NUM:1 } } } } },
+          { kind:"block", type:"sesame_girar_derecha",
+            inputs:{ DURACION:{ shadow:{ type:"math_number", fields:{ NUM:1 } } } } },
+          { kind:"block", type:"sesame_girar_izquierda",
+            inputs:{ DURACION:{ shadow:{ type:"math_number", fields:{ NUM:1 } } } } },
+          { kind:"block", type:"sesame_girar_angulo",
+            inputs:{ ANGULO:{ shadow:{ type:"math_number", fields:{ NUM:90 } } } } },
+          { kind:"block", type:"sesame_detener" }
+        ]
+      },
+      {
+        kind:"category", name:"Emotes", colour:"#cba6f7",
+        contents:[{ kind:"block", type:"sesame_emote" }]
+      },
+      { kind:"sep" },
+      {
+        kind:"category", name:"Ciclos", colour:"#fab387",
+        contents:[
+          { kind:"block", type:"controls_repeat" },
+          { kind:"block", type:"controls_whileUntil" }
+        ]
+      },
+      // Variables category is built dynamically
+      buildVariablesCategory(),
+      {
+        kind:"category", name:"Operadores", colour:"#a6e3a1",
+        contents:[
+          { kind:"block", type:"math_random_int",
+            inputs:{
+              FROM:{ shadow:{ type:"math_number", fields:{ NUM:1  } } },
+              TO:{   shadow:{ type:"math_number", fields:{ NUM:10 } } }
+            }
+          },
+          { kind:"block", type:"math_number", fields:{ NUM:1 } },
+          { kind:"block", type:"math_arithmetic" }
+        ]
+      },
+      {
+        kind:"category", name:"Comparadores", colour:"#9fc5e8",
+        contents:[
+          { kind:"block", type:"logic_compare" },
+          { kind:"block", type:"logic_operation" },
+          { kind:"block", type:"logic_negate" },
+          { kind:"block", type:"logic_boolean" }
+        ]
+      }
+    ]
+  };
+}
+
+function refreshToolbox() {
+  // updateToolbox replaces the entire toolbox config in place,
+  // preserving existing blocks on the canvas.
+  workspace.updateToolbox(buildToolboxConfig());
+}
+
+function renderVarList() {
+  const list = document.getElementById('var-list');
+  const empty = document.getElementById('var-empty');
+
+  // Remove all existing var-item elements (but not #var-empty)
+  list.querySelectorAll('.var-item').forEach(el => el.remove());
+
+  if (variables.length === 0) {
+    empty.style.display = 'block';
+    return;
+  }
+
+  empty.style.display = 'none';
+
+  for (const name of variables) {
+    const item = document.createElement('div');
+    item.className = 'var-item';
+    item.innerHTML = `
+      <span>${name}</span>
+      <button class="var-delete" title="Eliminar variable" onclick="eliminarVariable('${name}')">✕</button>
+    `;
+    list.appendChild(item);
+  }
+}
+
+function nuevaVariable() {
+  const name = prompt('Nombre de la nueva variable:');
+  if (!name) return;
+
+  const clean = name.trim().replace(/\s+/g, '_');
+  if (!clean) return;
+
+  // Validate: Python identifier characters only
+  if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(clean)) {
+    alert(`"${clean}" no es un nombre válido. Usa solo letras, números y guiones bajos, sin empezar con un número.`);
+    return;
+  }
+
+  if (variables.includes(clean)) {
+    alert(`Ya existe una variable llamada "${clean}".`);
+    return;
+  }
+
+  variables.push(clean);
+  renderVarList();
+  refreshToolbox();
+}
+
+function eliminarVariable(name) {
+  if (!confirm(`¿Eliminar la variable "${name}"?\nLos bloques que la usen en el canvas quedarán con el nombre pero seguirán funcionando.`)) return;
+  variables = variables.filter(v => v !== name);
+  renderVarList();
+  refreshToolbox();
+}
 
 
 // ── 4. Inject workspace ───────────────────────────────────────────────────────
 const workspace = Blockly.inject('blockly-div', {
-  toolbox: toolboxConfig,
+  toolbox: buildToolboxConfig(),
   theme: Blockly.Themes.Dark,
   grid: { spacing:24, length:4, colour:'#313244', snap:true },
   zoom: { controls:true, wheel:true, startScale:1.0, maxScale:3, minScale:0.3 },
@@ -418,29 +544,22 @@ requestAnimationFrame(() => requestAnimationFrame(colocarBloqueInicial));
 
 
 // ── 6. Code extractor ─────────────────────────────────────────────────────────
-// BUG 1 FIX: the correct approach for Blockly 9.x is to generate the full
-// workspace code and then extract only the portion belonging to the hat block,
-// by walking the chain manually but using blockToCode with ONLY the single
-// block (not its chain) — achieved by temporarily nulling nextConnection.
 function extraerCodigo() {
   const hat = workspace.getTopBlocks(true).find(b => b.type === 'sesame_al_iniciar');
   if (!hat) return '';
 
+  // init() required in Blockly 9.x before any code generation
   pyGen.init(workspace);
 
-  // Collect code for each block in the chain individually.
-  // We generate code block-by-block to avoid the recursive duplication,
-  // but use the generator's own blockToCode which handles value inputs,
-  // loops (which have inner chains), and variables correctly.
   const lines = [];
   let cur = hat.getNextBlock();
 
   while (cur) {
-    // Save and temporarily sever the next connection so blockToCode
-    // only generates THIS block (and its inner body for loops), not
-    // the entire remaining chain, which was causing the duplication.
-    const savedNext = cur.nextConnection && cur.nextConnection.targetConnection;
-    if (savedNext) cur.nextConnection.disconnect();
+    // Temporarily disconnect next block so blockToCode generates only
+    // THIS block (avoiding the recursive chain duplication bug)
+    const nextConn   = cur.nextConnection;
+    const targetConn = nextConn && nextConn.targetConnection;
+    if (targetConn) nextConn.disconnect();
 
     try {
       const code = pyGen.blockToCode(cur);
@@ -449,8 +568,7 @@ function extraerCodigo() {
         if (text.trim()) lines.push(text.trimEnd());
       }
     } finally {
-      // Always reconnect, even if code generation threw
-      if (savedNext) cur.nextConnection.connect(savedNext);
+      if (targetConn) nextConn.connect(targetConn);
     }
 
     cur = cur.getNextBlock();
@@ -468,7 +586,7 @@ workspace.addChangeListener(() => {
       code || '# Arrastra bloques debajo de\n# "🟢 Al iniciar" para ver\n# el código aquí.';
   } catch(e) {
     console.error('Error generando código:', e);
-    document.getElementById('code-output').textContent = '# Error generando código:\n# ' + e.message;
+    document.getElementById('code-output').textContent = '# Error:\n# ' + e.message;
   }
 });
 
