@@ -26,7 +26,7 @@ def _send_go(direction: str):
 
 
 def _send_stop():
-    """Envía el comando stop=1 al robot."""
+    """Envía el comando stop=1 al robot. Diferente del evento interno stop_event"""
     controller = connection.get_controller()
     if controller.is_mock:
         print("   TX (mock): stop=1")
@@ -197,7 +197,11 @@ def secuencia_movimiento(steps: list):
             ("forward", 3),
         ])
     """
-    connection._reset_stop()
+    stop_event = connection.get_stop_event()
+
+    if stop_event.is_set():
+        print(f"[INFO] secuencia de pasos ignorada")
+        return
     print(f"[INFO] Ejecutando secuencia de {len(steps)} pasos. Presiona ESPACIO para abortar.")
 
     for direction, duration in steps:
