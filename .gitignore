@@ -6,3 +6,4 @@ build/
 .venv/
 .env
 tests/
+crea_sesame_lib/gui/colorCodes.txt

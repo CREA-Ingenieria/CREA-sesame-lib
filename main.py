@@ -5,7 +5,5 @@ if __name__ == "__main__":
     launch()
 
     ##TODO
-    ## Añadir variables a los bloques
-    ## Añadir random int 
-    ##Añadir comparadores
+    ## Añadir if - else y toda esa wea
     ##Cambiar todo el UI por algo no feo
