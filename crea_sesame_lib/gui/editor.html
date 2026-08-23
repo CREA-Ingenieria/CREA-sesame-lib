@@ -214,6 +214,22 @@ Blockly.Msg['LOGIC_OPERATION_HELPURL']            = '';
 Blockly.Msg['LOGIC_NEGATE_TITLE']                 = 'no %1';
 Blockly.Msg['LOGIC_NEGATE_TOOLTIP']               = 'Invierte el valor booleano.';
 Blockly.Msg['LOGIC_NEGATE_HELPURL']               = '';
+// ── If / else if / else ──
+Blockly.Msg['CONTROLS_IF_MSG_IF']           = 'si';
+Blockly.Msg['CONTROLS_IF_MSG_ELSEIF']       = 'si no, si';
+Blockly.Msg['CONTROLS_IF_MSG_ELSE']         = 'si no';
+Blockly.Msg['CONTROLS_IF_MSG_THEN']         = 'hacer';
+Blockly.Msg['CONTROLS_IF_TOOLTIP_1']        = 'Si la condición es verdadera, ejecuta los bloques internos.';
+Blockly.Msg['CONTROLS_IF_TOOLTIP_2']        = 'Si la condición es verdadera, ejecuta el primer bloque. Si no, ejecuta el segundo.';
+Blockly.Msg['CONTROLS_IF_TOOLTIP_3']        = 'Si la primera condición es verdadera, ejecuta el primer bloque. Si no, prueba la segunda condición.';
+Blockly.Msg['CONTROLS_IF_TOOLTIP_4']        = 'Si la primera condición es verdadera, ejecuta el primer bloque. Si no, prueba la segunda condición. Si ninguna es verdadera, ejecuta el último bloque.';
+Blockly.Msg['CONTROLS_IF_HELPURL']          = '';
+Blockly.Msg['CONTROLS_IF_IF_TITLE_IF']      = 'si';
+Blockly.Msg['CONTROLS_IF_IF_TOOLTIP']       = 'Agrega, elimina o reordena secciones para ajustar este bloque.';
+Blockly.Msg['CONTROLS_IF_ELSEIF_TITLE_ELSEIF'] = 'si no, si';
+Blockly.Msg['CONTROLS_IF_ELSEIF_TOOLTIP']   = 'Agrega una condición "si no, si" al bloque.';
+Blockly.Msg['CONTROLS_IF_ELSE_TITLE_ELSE']  = 'si no';
+Blockly.Msg['CONTROLS_IF_ELSE_TOOLTIP']     = 'Agrega un bloque final "si no" que se ejecuta si ninguna condición es verdadera.';
 
 
 // ── 1. Block definitions ──────────────────────────────────────────────────────
@@ -445,6 +461,16 @@ function buildToolboxConfig() {
       {
         kind:"category", name:"Comparadores", colour:"#9fc5e8",
         contents:[
+          // if / else if / else
+          { kind:"block", type:"controls_if" },
+          // A preset version with an else-if and else already added
+          // so students can see the full structure without using the mutator
+          {
+            kind:"block", type:"controls_if",
+            extraState: { "elseIfCount": 1, "hasElse": true }
+          },
+          { kind:"sep" },
+          // Comparators
           { kind:"block", type:"logic_compare" },
           { kind:"block", type:"logic_operation" },
           { kind:"block", type:"logic_negate" },
