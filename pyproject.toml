@@ -8,7 +8,7 @@ version = "0.1.0"
 description = "High-level abstraction layer for CREA Sesame robot control"
 requires-python = ">=3.9"
 dependencies = [
-    "crea-sesame-companion @ git+https://github.com/your-org/crea-sesame-companion.git@1365374ff23a46b8ef02186247dde6180fff8843",
+    "crea-sesame-companion @ git+https://github.com/CREA-sesame-robot/CREA-sesame-companion.git@1365374ff23a46b8ef02186247dde6180fff8843",
     "pywebview>=5.0"
 ]
 
