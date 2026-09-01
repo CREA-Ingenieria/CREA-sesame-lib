@@ -1,7 +1,7 @@
 """
 Ejecuta este script UNA VEZ para descargar Blockly localmente.
-Coloca este archivo en la raíz del proyecto (CREA-sesame-lib/)
-y ejecuta:  python download_blockly.py
+Puede ser dandole click al botón ▶︎ de la derecha arriba
+O ejecutando python download.py
 """
 import urllib.request
 import os
@@ -30,7 +30,7 @@ def main():
             size = os.path.getsize(dest)
             print(f"✓  ({size // 1024} KB)")
             if size < 10_000:
-                print(f"  ⚠ Archivo sospechosamente pequeño ({size} bytes)")
+                print(f"  WARNING: Archivo sospechosamente pequeño ({size} bytes)")
                 print(f"  Contenido: {open(dest).read()[:120]}")
         except Exception as e:
             print(f"\n✗  Error: {e}")

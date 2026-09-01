@@ -1,6 +1,6 @@
 # CREA Sesame Lib
 
-Librería de Python que provee una capa de abstracción sobre [`CREA-sesame-companion`](https://github.com/CREA-robotics/CREA-sesame-companion) para simplificar el control del robot Sesame. Permite a los estudiantes mover, girar y animar el robot con llamadas a funciones simples, sin necesidad de manejar la conexión ni las peticiones HTTP directamente.
+Librería de Python que provee una capa de abstracción sobre [`CREA-sesame-companion`](https://github.com/dorianborian/sesame-companion-app) para simplificar el control del robot Sesame. Permite a los estudiantes mover, girar y animar el robot con llamadas a funciones simples, sin necesidad de manejar la conexión ni las peticiones HTTP directamente.
 
 Además incluye un **editor visual de bloques** (estilo Scratch) para estudiantes que prefieren programar sin escribir código.
 
@@ -17,7 +17,7 @@ CREA-sesame-lib/
 │   ├── emotes.py             # Funciones de animaciones del robot
 │   └── gui/                  # Editor visual de bloques
 │       ├── __init__.py
-│       ├── editor.py         # Ventana pywebview y bridge Python ↔ JavaScript
+│       ├── editor.py         # Ventana pywebview y conexión Python y JavaScript
 │       ├── editor.html       # Canvas de Blockly con los bloques personalizados
 │       └── blockly/          # Archivos de Blockly descargados localmente
 │           ├── blockly_compressed.js
@@ -43,39 +43,50 @@ CREA-sesame-lib/
 
 ## Uso
 
-### Opción A — Editor visual de bloques
+### Opción A: Editor visual de bloques
 
 Ideal para estudiantes que no tienen experiencia previa con Python.
 
-**Paso 1 — Activar el entorno virtual**
+**Paso 1: Crear el entorno virtual (necesario hacer solo una vez)**
 
 ```bash
 # Windows
+python -m venv .venv
 .venv\Scripts\activate
 ```
 
-**Paso 2 — Ejecutar el editor**
+**Paso 2: Descargar las dependencias**
+
+```bash
+pip install -e .
+python download_blockly.py
+```
+
+**Paso 3: Ejecutar el editor por bloques**
 
 ```bash
 python main.py
 ```
 
+
 Se abrirá una ventana con el editor de bloques. Desde ahí puedes conectarte al robot (o activar el modo simulación), armar tu programa arrastrando bloques y presionar **Ejecutar**.
 
 ---
 
-### Opción B — Uso por código Python
+### Opción B: Uso por código Python
 
 Ideal para estudiantes que quieren escribir sus propios programas.
 
-**Paso 1 — Activar el entorno virtual**
+**Paso 1: Crear el entorno virtual (necesario hacer solo una vez)**
 
 ```bash
 # Windows
+python -m venv .venv
 .venv\Scripts\activate
+pip install -e .
 ```
 
-**Paso 2 — Escribir y ejecutar tu programa**
+**Paso 2:  Escribir y ejecutar tu programa**
 
 Crea un archivo `.py` e importa los módulos que necesites:
 
@@ -104,9 +115,8 @@ movimiento.detener()
 ## Instalación para desarrolladores
 
 ```bash
-# Clonar ambos repositorios al mismo nivel
-git clone https://github.com/CREA-robotics/CREA-sesame-companion
-git clone https://github.com/CREA-robotics/CREA-sesame-lib
+# Clonar el repositorio
+git clone https://github.com/CREA-sesame-robot/CREA-sesame-lib.git
 
 # Crear y activar el entorno virtual dentro de sesame-lib
 cd CREA-sesame-lib
@@ -114,7 +124,6 @@ python -m venv .venv
 .venv\Scripts\activate
 
 # Instalar dependencias
-pip install -e ../CREA-sesame-companion
 pip install -e .
 
 # Descargar Blockly (solo una vez, necesario para el editor visual)
